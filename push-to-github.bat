@@ -7,40 +7,29 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/4] Staging all changes...
+echo [1/3] Staging all changes...
 git add .
 git status
 
 echo.
-echo [2/4] Committing...
-git commit -m "feat(auth): Phase 2 — Supabase auth integration
+echo [2/3] Committing...
+git commit -m "feat(products): Phase 3 — Supabase-driven product catalogue
 
-- Add @supabase/supabase-js dependency
-- Create src/lib/supabase.js — Supabase client
-- Create src/context/AuthContext.jsx — auth state (signIn/signUp/signOut)
-- Create src/components/AuthModal.jsx — KAAFI-styled login/signup modal
-- Update src/main.jsx — wrap app with AuthProvider
-- Update src/App.jsx — user icon in Nav, protected checkout, auth modal
-- Create supabase/schema.sql — full DB schema with RLS + seed data"
+- Add src/hooks/useProducts.js — fetches active products from DB
+- Replace hardcoded PRODUCTS array with live Supabase data
+- Add ProductSkeleton component for loading state
+- Add shimmer animation to index.css
+- Pass products down to ProductGrid, Shop, Product pages
+- Fallback to hardcoded data if Supabase is unreachable"
 
 echo.
-echo [3/4] Pushing to GitHub...
+echo [3/3] Pushing to GitHub...
 git push origin main
 
 echo.
 echo  =============================================
-echo   Done! Phase 2 is live at:
-echo   https://github.com/Kunall1/kaafi-store
+echo   Done! Phase 3 is live.
+echo   Products now load from your Supabase DB.
 echo  =============================================
-echo.
-echo  NEXT: Run the Supabase schema
-echo  1. Go to https://supabase.com/dashboard
-echo  2. Open kaafi-store project
-echo  3. SQL Editor ^> New Query
-echo  4. Paste contents of supabase/schema.sql
-echo  5. Click Run
-echo.
-echo  ALSO: Run npm install in this folder to fix local node_modules:
-echo  Open a terminal here and run: npm install
 echo.
 pause

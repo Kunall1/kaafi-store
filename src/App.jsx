@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./context/AuthContext";
+import { useProducts } from "./hooks/useProducts";
 import AuthModal from "./components/AuthModal";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -13,28 +14,8 @@ const SIZE_CHART = {
   },
 };
 
-const PRODUCTS = [
-  {
-    id: "crop-tee-black", name: "Cropped Tee", color: "Black",
-    colorHex: "#111", price: 999, sizes: ["S", "M", "L"],
-    description: "Crafted with intention. A cropped silhouette that speaks through silence. Premium construction, built for everyday wear.",
-    details: ["240 GSM french terry cotton", "Premium stitching", "Cropped relaxed fit", "Ribbed crew neck", "Made in India"],
-    images: [
-      "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800&q=80",
-      "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&q=80",
-    ],
-  },
-  {
-    id: "crop-tee-white", name: "Cropped Tee", color: "White",
-    colorHex: "#F2F2F0", price: 999, sizes: ["S", "M", "L"],
-    description: "Crafted with intention. A cropped silhouette that speaks through silence. Premium construction, built for everyday wear.",
-    details: ["240 GSM french terry cotton", "Premium stitching", "Cropped relaxed fit", "Ribbed crew neck", "Made in India"],
-    images: [
-      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80",
-      "https://images.unsplash.com/photo-1622445275463-afa2ab738c34?w=800&q=80",
-    ],
-  },
-];
+// Products are now fetched from Supabase via useProducts() in the App root.
+// The hardcoded fallback lives in src/hooks/useProducts.js → FALLBACK_PRODUCTS.
 
 // Styles are in src/index.css
 
@@ -411,8 +392,33 @@ function CollectionBanner({ setPage }) {
   );
 }
 
+// ─── PRODUCT SKELETON ────────────────────────────────────────────────────────
+// Shown while products are loading from Supabase.
+function ProductSkeleton() {
+  return (
+    <div style={{
+      aspectRatio: "3/4", background: "#0d0d0d",
+      animation: "pulse 1.6s ease-in-out infinite",
+      position: "relative", overflow: "hidden",
+    }}>
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(90deg, transparent 25%, #1a1a1a 50%, transparent 75%)",
+        backgroundSize: "200% 100%",
+        animation: "shimmer 1.6s infinite",
+      }} />
+      <div style={{
+        position: "absolute", bottom: 48, left: 20, right: 20,
+      }}>
+        <div style={{ height: 13, background: "#1a1a1a", borderRadius: 2, marginBottom: 6, width: "60%" }} />
+        <div style={{ height: 14, background: "#1a1a1a", borderRadius: 2, width: "30%" }} />
+      </div>
+    </div>
+  );
+}
+
 // ─── PRODUCT GRID (HOME) ─────────────────────────────────────────────────────
-function ProductGrid({ setPage, setSel }) {
+function ProductGrid({ setPage, setSel, products = [], loading = false }) {
   const [v, setV] = useState(false);
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setV(true); }, { threshold: 0.1 });
@@ -446,27 +452,30 @@ function ProductGrid({ setPage, setSel }) {
         display: "grid", gridTemplateColumns: "1fr 1fr",
         gap: 4, maxWidth: 1200, margin: "0 auto",
       }}>
-        {PRODUCTS.map((p, i) => (
-          <div key={p.id} className="product-card"
-            onClick={() => { setSel(p); setPage("product"); }}
-            style={{
-              aspectRatio: "3/4",
-              opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(30px)",
-              transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${0.1 + i * 0.15}s`,
-            }}>
-            <img src={p.images[0]} alt={p.name} />
-            <div className="quick-add">Quick Add</div>
-            <div style={{
-              position: "absolute", bottom: 48, left: 0, right: 0,
-              padding: "0 20px", zIndex: 2,
-            }}>
-              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{p.name} — {p.color}</p>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <p style={{ fontSize: 14, fontWeight: 700 }}>₹{p.price}</p>
+        {loading
+          ? [0, 1].map(i => <ProductSkeleton key={i} />)
+          : products.map((p, i) => (
+            <div key={p.id} className="product-card"
+              onClick={() => { setSel(p); setPage("product"); }}
+              style={{
+                aspectRatio: "3/4",
+                opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(30px)",
+                transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${0.1 + i * 0.15}s`,
+              }}>
+              <img src={p.images[0]} alt={p.name} />
+              <div className="quick-add">Quick Add</div>
+              <div style={{
+                position: "absolute", bottom: 48, left: 0, right: 0,
+                padding: "0 20px", zIndex: 2,
+              }}>
+                <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{p.name} — {p.color}</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <p style={{ fontSize: 14, fontWeight: 700 }}>₹{p.price}</p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        }
       </div>
     </div>
   );
@@ -499,12 +508,12 @@ function Features() {
 }
 
 // ─── HOME PAGE ───────────────────────────────────────────────────────────────
-function Home({ setPage, setSel, onCart, cc, onAuthClick, onSignOut }) {
+function Home({ setPage, setSel, onCart, cc, onAuthClick, onSignOut, products, productsLoading }) {
   return (
     <div>
       <Hero setPage={setPage} onCart={onCart} cc={cc} onAuthClick={onAuthClick} onSignOut={onSignOut} />
       <MarqueeSection text="FOUNDER'S DROP — CROP ESSENTIALS — KAAFI — PREMIUM CRAFT" />
-      <ProductGrid setPage={setPage} setSel={setSel} />
+      <ProductGrid setPage={setPage} setSel={setSel} products={products} loading={productsLoading} />
       <CollectionBanner setPage={setPage} />
       <MarqueeSection text="KAAFI — CRAFTED WITH INTENTION — MADE IN INDIA — CROP ESSENTIALS" bg="#fff" color="#000" />
       <Features />
@@ -513,7 +522,7 @@ function Home({ setPage, setSel, onCart, cc, onAuthClick, onSignOut }) {
 }
 
 // ─── SHOP PAGE ───────────────────────────────────────────────────────────────
-function Shop({ setPage, setSel, onCart, cc, onAuthClick, onSignOut }) {
+function Shop({ setPage, setSel, onCart, cc, onAuthClick, onSignOut, products, productsLoading }) {
   const [v, setV] = useState(false);
   useEffect(() => { setTimeout(() => setV(true), 100); }, []);
 
@@ -531,22 +540,25 @@ function Shop({ setPage, setSel, onCart, cc, onAuthClick, onSignOut }) {
             </h1>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-            {PRODUCTS.map((p, i) => (
-              <div key={p.id} className="product-card"
-                onClick={() => { setSel(p); setPage("product"); }}
-                style={{
-                  aspectRatio: "3/4",
-                  opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(30px)",
-                  transition: `all 0.8s ease ${0.1 + i * 0.12}s`,
-                }}>
-                <img src={p.images[0]} alt={p.name} />
-                <div className="quick-add">Quick Add</div>
-                <div style={{ position: "absolute", bottom: 48, left: 0, right: 0, padding: "0 20px", zIndex: 2 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{p.name} — {p.color}</p>
-                  <p style={{ fontSize: 15, fontWeight: 700 }}>₹{p.price}</p>
+            {productsLoading
+              ? [0, 1].map(i => <ProductSkeleton key={i} />)
+              : products.map((p, i) => (
+                <div key={p.id} className="product-card"
+                  onClick={() => { setSel(p); setPage("product"); }}
+                  style={{
+                    aspectRatio: "3/4",
+                    opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(30px)",
+                    transition: `all 0.8s ease ${0.1 + i * 0.12}s`,
+                  }}>
+                  <img src={p.images[0]} alt={p.name} />
+                  <div className="quick-add">Quick Add</div>
+                  <div style={{ position: "absolute", bottom: 48, left: 0, right: 0, padding: "0 20px", zIndex: 2 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{p.name} — {p.color}</p>
+                    <p style={{ fontSize: 15, fontWeight: 700 }}>₹{p.price}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            }
           </div>
         </div>
       </div>
@@ -609,7 +621,7 @@ function SizeGuide({ open, onClose, sel }) {
 }
 
 // ─── PRODUCT PAGE ────────────────────────────────────────────────────────────
-function Product({ product, addToCart, setPage, onCart, cc, onAuthClick, onSignOut }) {
+function Product({ product, addToCart, setPage, onCart, cc, onAuthClick, onSignOut, products = [] }) {
   const [sz, setSz] = useState(null);
   const [col, setCol] = useState(product.color);
   const [img, setImg] = useState(0);
@@ -617,7 +629,8 @@ function Product({ product, addToCart, setPage, onCart, cc, onAuthClick, onSignO
   const [sg, setSg] = useState(false);
   const [v, setV] = useState(false);
   useEffect(() => { setTimeout(() => setV(true), 100); }, []);
-  const cur = PRODUCTS.find(p => p.color === col) || product;
+  // Find the product matching the selected colour (for colour-swap on the detail page)
+  const cur = products.find(p => p.color === col) || product;
 
   const add = () => {
     if (!sz) return;
@@ -687,7 +700,7 @@ function Product({ product, addToCart, setPage, onCart, cc, onAuthClick, onSignO
                 Color: <span style={{ color: "#fff" }}>{col}</span>
               </p>
               <div style={{ display: "flex", gap: 12 }}>
-                {PRODUCTS.map(p => (
+                {products.map(p => (
                   <div key={p.color} className={`c-dot ${col === p.color ? "ac" : ""}`}
                     onClick={() => { setCol(p.color); setImg(0); }}
                     style={{ background: p.colorHex }} />
@@ -1086,15 +1099,23 @@ function Footer({ setPage }) {
 
 // ─── APP ROOT ────────────────────────────────────────────────────────────────
 export default function App() {
-  const { user, signOut } = useAuth();
+  const { user, signOut }                    = useAuth();
+  const { products, loading: productsLoading } = useProducts();
 
-  const [pg, setPg]             = useState("home");
-  const [cart, setCart]         = useState([]);
-  const [co, setCo]             = useState(false);   // cart open
-  const [sel, setSel]           = useState(PRODUCTS[0]);
-  const [od, setOD]             = useState(null);    // order data
-  const [showAuth, setShowAuth] = useState(false);   // auth modal open
-  const [afterAuth, setAfterAuth] = useState(null);  // action to run after login
+  const [pg, setPg]               = useState("home");
+  const [cart, setCart]           = useState([]);
+  const [co, setCo]               = useState(false);   // cart open
+  const [sel, setSel]             = useState(null);    // selected product (set once products load)
+  const [od, setOD]               = useState(null);    // order data
+  const [showAuth, setShowAuth]   = useState(false);   // auth modal open
+  const [afterAuth, setAfterAuth] = useState(null);    // action to run after login
+
+  // Set initial product selection once products have loaded
+  useEffect(() => {
+    if (products.length > 0 && !sel) {
+      setSel(products[0]);
+    }
+  }, [products, sel]);
 
   const nav = useCallback(p => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1151,6 +1172,12 @@ export default function App() {
     onSignOut:   handleSignOut,
   };
 
+  // ── Common product props ───────────────────────────────────────────────────
+  const productProps = {
+    products,
+    productsLoading,
+  };
+
   return (
     <div>
       {/* Cart drawer */}
@@ -1163,9 +1190,9 @@ export default function App() {
       />
 
       {/* Pages */}
-      {pg === "home"     && <Home     {...navProps} setSel={setSel} />}
-      {pg === "shop"     && <Shop     {...navProps} setSel={setSel} />}
-      {pg === "product"  && <Product  product={sel} addToCart={addToCart} {...navProps} />}
+      {pg === "home"     && <Home     {...navProps} {...productProps} setSel={setSel} />}
+      {pg === "shop"     && <Shop     {...navProps} {...productProps} setSel={setSel} />}
+      {pg === "product"  && sel && <Product  product={sel} addToCart={addToCart} products={products} {...navProps} />}
       {pg === "about"    && <About    {...navProps} />}
       {pg === "checkout" && <Checkout cart={cart} setPage={nav} setOD={setOD} {...navProps} />}
       {pg === "confirm"  && <Confirm  od={od} setPage={nav} />}
