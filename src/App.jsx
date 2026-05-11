@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "./context/AuthContext";
+import AuthModal from "./components/AuthModal";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +66,25 @@ function AnnouncementBar() {
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
-function Nav({ setPage, cc, onCart, dark = true }) {
+function Nav({ setPage, cc, onCart, dark = true, onAuthClick, onSignOut }) {
+  const { user } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = e => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  const stroke = dark ? "#fff" : "#000";
+
   return (
     <nav style={{
       position: "absolute", top: 0, left: 0, right: 0, zIndex: 40,
@@ -73,7 +93,7 @@ function Nav({ setPage, cc, onCart, dark = true }) {
     }}>
       {/* Hamburger */}
       <div style={{ cursor: "pointer", padding: 8 }} onClick={() => setPage("about")}>
-        <svg width="24" height="16" viewBox="0 0 24 16" fill="none" stroke={dark ? "#fff" : "#000"} strokeWidth="1.8">
+        <svg width="24" height="16" viewBox="0 0 24 16" fill="none" stroke={stroke} strokeWidth="1.8">
           <line x1="0" y1="1" x2="24" y2="1"/><line x1="0" y1="8" x2="16" y2="8"/><line x1="0" y1="15" x2="24" y2="15"/>
         </svg>
       </div>
@@ -88,21 +108,97 @@ function Nav({ setPage, cc, onCart, dark = true }) {
         }}>KAAFI</span>
       </div>
 
-      {/* Cart */}
-      <div onClick={onCart} style={{ cursor: "pointer", padding: 8, position: "relative" }}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={dark ? "#fff" : "#000"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <path d="M16 10a4 4 0 01-8 0"/>
-        </svg>
-        {cc > 0 && <span className="badge">{cc}</span>}
+      {/* Right side: User icon + Cart */}
+      <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+
+        {/* User icon */}
+        <div ref={menuRef} style={{ position: "relative" }}>
+          <div
+            onClick={() => user ? setMenuOpen(m => !m) : onAuthClick?.()}
+            style={{ cursor: "pointer", padding: 8, position: "relative" }}
+            title={user ? user.email : "Sign in"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            {/* Green dot when logged in */}
+            {user && (
+              <span style={{
+                position: "absolute", top: 7, right: 7,
+                width: 6, height: 6, borderRadius: "50%",
+                background: "#22c55e",
+                border: `1.5px solid ${dark ? "#0a0a0a" : "#fff"}`,
+              }} />
+            )}
+          </div>
+
+          {/* Dropdown menu (only when logged in) */}
+          {menuOpen && (
+            <div style={{
+              position: "absolute", right: 0, top: "calc(100% + 4px)",
+              background: "#0a0a0a", border: "1px solid #1e1e1e",
+              minWidth: 170, zIndex: 100,
+              animation: "fadeIn 0.15s ease",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+            }}>
+              {/* Logged in as */}
+              <div style={{
+                padding: "10px 16px 8px",
+                fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                color: "#444", borderBottom: "1px solid #1a1a1a",
+              }}>
+                {user.email}
+              </div>
+              {/* My Orders */}
+              <div
+                onClick={() => { setMenuOpen(false); setPage("orders"); }}
+                style={{
+                  padding: "13px 16px", fontSize: 10, letterSpacing: "0.12em",
+                  textTransform: "uppercase", fontWeight: 600, cursor: "pointer",
+                  color: "#fff", borderBottom: "1px solid #1a1a1a",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#111"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                My Orders
+              </div>
+              {/* Sign Out */}
+              <div
+                onClick={() => { setMenuOpen(false); onSignOut?.(); }}
+                style={{
+                  padding: "13px 16px", fontSize: 10, letterSpacing: "0.12em",
+                  textTransform: "uppercase", fontWeight: 600, cursor: "pointer",
+                  color: "#e05252",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#111"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                Sign Out
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Cart */}
+        <div onClick={onCart} style={{ cursor: "pointer", padding: 8, position: "relative" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 01-8 0"/>
+          </svg>
+          {cc > 0 && <span className="badge">{cc}</span>}
+        </div>
+
       </div>
     </nav>
   );
 }
 
 // ─── HERO ────────────────────────────────────────────────────────────────────
-function Hero({ setPage, onCart, cc }) {
+function Hero({ setPage, onCart, cc, onAuthClick, onSignOut }) {
   const [v, setV] = useState(false);
   useEffect(() => { setTimeout(() => setV(true), 300); }, []);
 
@@ -113,7 +209,7 @@ function Hero({ setPage, onCart, cc }) {
         position: "relative", height: "100vh", overflow: "hidden",
         background: "#0a0a0a",
       }}>
-        <Nav setPage={setPage} cc={cc} onCart={onCart} />
+        <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
 
         {/* Dark studio background */}
         <div style={{
@@ -403,10 +499,10 @@ function Features() {
 }
 
 // ─── HOME PAGE ───────────────────────────────────────────────────────────────
-function Home({ setPage, setSel, onCart, cc }) {
+function Home({ setPage, setSel, onCart, cc, onAuthClick, onSignOut }) {
   return (
     <div>
-      <Hero setPage={setPage} onCart={onCart} cc={cc} />
+      <Hero setPage={setPage} onCart={onCart} cc={cc} onAuthClick={onAuthClick} onSignOut={onSignOut} />
       <MarqueeSection text="FOUNDER'S DROP — CROP ESSENTIALS — KAAFI — PREMIUM CRAFT" />
       <ProductGrid setPage={setPage} setSel={setSel} />
       <CollectionBanner setPage={setPage} />
@@ -417,14 +513,14 @@ function Home({ setPage, setSel, onCart, cc }) {
 }
 
 // ─── SHOP PAGE ───────────────────────────────────────────────────────────────
-function Shop({ setPage, setSel, onCart, cc }) {
+function Shop({ setPage, setSel, onCart, cc, onAuthClick, onSignOut }) {
   const [v, setV] = useState(false);
   useEffect(() => { setTimeout(() => setV(true), 100); }, []);
 
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
       <div style={{ position: "relative", padding: "80px 24px 24px" }}>
-        <Nav setPage={setPage} cc={cc} onCart={onCart} />
+        <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ borderBottom: "1px solid #222", paddingBottom: 24, marginBottom: 32 }}>
             <p style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#555", fontWeight: 500, marginBottom: 8 }}>
@@ -513,7 +609,7 @@ function SizeGuide({ open, onClose, sel }) {
 }
 
 // ─── PRODUCT PAGE ────────────────────────────────────────────────────────────
-function Product({ product, addToCart, setPage, onCart, cc }) {
+function Product({ product, addToCart, setPage, onCart, cc, onAuthClick, onSignOut }) {
   const [sz, setSz] = useState(null);
   const [col, setCol] = useState(product.color);
   const [img, setImg] = useState(0);
@@ -534,7 +630,7 @@ function Product({ product, addToCart, setPage, onCart, cc }) {
     <>
       <SizeGuide open={sg} onClose={() => setSg(false)} sel={sz} />
       <div style={{ background: "#000", minHeight: "100vh" }}>
-        <Nav setPage={setPage} cc={cc} onCart={onCart} />
+        <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
         <div style={{
           paddingTop: 64,
           display: "grid", gridTemplateColumns: "1fr 1fr",
@@ -675,13 +771,13 @@ function Product({ product, addToCart, setPage, onCart, cc }) {
 }
 
 // ─── ABOUT ───────────────────────────────────────────────────────────────────
-function About({ setPage, onCart, cc }) {
+function About({ setPage, onCart, cc, onAuthClick, onSignOut }) {
   const [v, setV] = useState(false);
   useEffect(() => { setTimeout(() => setV(true), 100); }, []);
 
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
-      <Nav setPage={setPage} cc={cc} onCart={onCart} />
+      <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "120px 24px 80px" }}>
         <p style={{
           fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
@@ -716,7 +812,8 @@ function About({ setPage, onCart, cc }) {
 }
 
 // ─── CART DRAWER ─────────────────────────────────────────────────────────────
-function CartDrawer({ cart, open, onClose, uq, ri, setPage }) {
+// handleCheckout is passed from App so auth guard logic lives in one place.
+function CartDrawer({ cart, open, onClose, uq, ri, setPage, handleCheckout }) {
   const total = cart.reduce((s, it) => s + it.price * it.qty, 0);
   return (
     <>
@@ -793,7 +890,7 @@ function CartDrawer({ cart, open, onClose, uq, ri, setPage }) {
               <span style={{ fontSize: 12, fontWeight: 700 }}>Total</span>
               <span style={{ fontSize: 18, fontWeight: 700 }}>₹{total}</span>
             </div>
-            <button onClick={() => { onClose(); setPage("checkout"); }} style={{
+            <button onClick={() => { onClose(); handleCheckout(); }} style={{
               width: "100%", padding: "18px", background: "#fff", color: "#000",
               border: "none", fontSize: 12, fontWeight: 700,
               letterSpacing: "0.2em", textTransform: "uppercase",
@@ -810,7 +907,7 @@ function CartDrawer({ cart, open, onClose, uq, ri, setPage }) {
 
 // ─── CHECKOUT ────────────────────────────────────────────────────────────────
 // NOTE: Payment is currently a placeholder — real Razorpay integration coming in Phase 4
-function Checkout({ cart, setPage, setOD, onCart, cc }) {
+function Checkout({ cart, setPage, setOD, onCart, cc, onAuthClick, onSignOut }) {
   const [f, setF] = useState({ name: "", email: "", phone: "", address: "", city: "", pincode: "" });
   const [pr, setPr] = useState(false);
   const [v, setV] = useState(false);
@@ -836,7 +933,7 @@ function Checkout({ cart, setPage, setOD, onCart, cc }) {
 
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
-      <Nav setPage={setPage} cc={cc} onCart={onCart} />
+      <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
       <div style={{
         maxWidth: 860, margin: "0 auto", padding: "100px 24px 80px",
         display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48,
@@ -989,17 +1086,46 @@ function Footer({ setPage }) {
 
 // ─── APP ROOT ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [pg, setPg] = useState("home");
-  const [cart, setCart] = useState([]);
-  const [co, setCo] = useState(false);
-  const [sel, setSel] = useState(PRODUCTS[0]);
-  const [od, setOD] = useState(null);
+  const { user, signOut } = useAuth();
+
+  const [pg, setPg]             = useState("home");
+  const [cart, setCart]         = useState([]);
+  const [co, setCo]             = useState(false);   // cart open
+  const [sel, setSel]           = useState(PRODUCTS[0]);
+  const [od, setOD]             = useState(null);    // order data
+  const [showAuth, setShowAuth] = useState(false);   // auth modal open
+  const [afterAuth, setAfterAuth] = useState(null);  // action to run after login
 
   const nav = useCallback(p => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => setPg(p), 150);
   }, []);
 
+  // ── Auth guard for checkout ────────────────────────────────────────────────
+  // If user is already logged in, go straight to checkout.
+  // If not, open the auth modal and remember to go to checkout after login.
+  const handleCheckout = useCallback(() => {
+    if (user) {
+      nav("checkout");
+    } else {
+      setAfterAuth(() => () => nav("checkout"));
+      setShowAuth(true);
+    }
+  }, [user, nav]);
+
+  const handleAuthSuccess = useCallback(() => {
+    if (afterAuth) {
+      afterAuth();
+      setAfterAuth(null);
+    }
+  }, [afterAuth]);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    if (pg === "checkout" || pg === "orders") nav("home");
+  }, [signOut, pg, nav]);
+
+  // ── Cart helpers ──────────────────────────────────────────────────────────
   const addToCart = useCallback(item => {
     setCart(prev => {
       const i = prev.findIndex(c => c.id === item.id && c.selectedSize === item.selectedSize);
@@ -1016,16 +1142,43 @@ export default function App() {
   const ri = useCallback(i => setCart(prev => prev.filter((_, idx) => idx !== i)), []);
   const cc = cart.reduce((s, it) => s + it.qty, 0);
 
+  // ── Common Nav props ──────────────────────────────────────────────────────
+  const navProps = {
+    setPage:     nav,
+    cc,
+    onCart:      () => setCo(true),
+    onAuthClick: () => setShowAuth(true),
+    onSignOut:   handleSignOut,
+  };
+
   return (
     <div>
-      <CartDrawer cart={cart} open={co} onClose={() => setCo(false)} uq={uq} ri={ri} setPage={nav} />
-      {pg === "home"     && <Home     setPage={nav} setSel={setSel} onCart={() => setCo(true)} cc={cc} />}
-      {pg === "shop"     && <Shop     setPage={nav} setSel={setSel} onCart={() => setCo(true)} cc={cc} />}
-      {pg === "product"  && <Product  product={sel} addToCart={addToCart} setPage={nav} onCart={() => setCo(true)} cc={cc} />}
-      {pg === "about"    && <About    setPage={nav} onCart={() => setCo(true)} cc={cc} />}
-      {pg === "checkout" && <Checkout cart={cart} setPage={nav} setOD={setOD} onCart={() => setCo(true)} cc={cc} />}
+      {/* Cart drawer */}
+      <CartDrawer
+        cart={cart} open={co}
+        onClose={() => setCo(false)}
+        uq={uq} ri={ri}
+        setPage={nav}
+        handleCheckout={handleCheckout}
+      />
+
+      {/* Pages */}
+      {pg === "home"     && <Home     {...navProps} setSel={setSel} />}
+      {pg === "shop"     && <Shop     {...navProps} setSel={setSel} />}
+      {pg === "product"  && <Product  product={sel} addToCart={addToCart} {...navProps} />}
+      {pg === "about"    && <About    {...navProps} />}
+      {pg === "checkout" && <Checkout cart={cart} setPage={nav} setOD={setOD} {...navProps} />}
       {pg === "confirm"  && <Confirm  od={od} setPage={nav} />}
+
       <Footer setPage={nav} />
+
+      {/* Auth modal — shown when user tries to checkout while logged out */}
+      {showAuth && (
+        <AuthModal
+          onClose={() => { setShowAuth(false); setAfterAuth(null); }}
+          onSuccess={handleAuthSuccess}
+        />
+      )}
     </div>
   );
 }
