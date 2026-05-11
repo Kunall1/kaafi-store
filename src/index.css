@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Uncial+Antiqua&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Uncial Antiqua', cursive;
+  background: #000;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: #fff; color: #000; }
+::-webkit-scrollbar { width: 0; }
+
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(1.08); } to { transform: scale(1); } }
+
+.product-card {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  background: #111;
+}
+.product-card img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.product-card:hover img { transform: scale(1.06); }
+.product-card .quick-add {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: #fff; color: #000;
+  text-align: center; padding: 14px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.product-card:hover .quick-add { transform: translateY(0); }
+
+.sz-btn {
+  width: 52px; height: 52px; border: 1px solid #333;
+  background: transparent; font-family: 'Uncial Antiqua', cursive;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.25s ease; display: flex;
+  align-items: center; justify-content: center; color: #fff;
+}
+.sz-btn:hover { border-color: #fff; background: #1a1a1a; }
+.sz-btn.ac { background: #fff; color: #000; border-color: #fff; }
+
+.c-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  cursor: pointer; position: relative;
+  transition: transform 0.3s ease;
+  border: 2px solid #333;
+}
+.c-dot:hover { transform: scale(1.1); }
+.c-dot.ac { border-color: #fff; }
+
+.badge {
+  position: absolute; top: -4px; right: -6px;
+  min-width: 16px; height: 16px; background: #fff;
+  color: #000; border-radius: 8px; font-size: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; padding: 0 3px;
+}
+
+input, textarea {
+  width: 100%; padding: 16px 16px; border: 1px solid #333;
+  background: #0a0a0a; font-family: 'Uncial Antiqua', cursive;
+  font-size: 14px; font-weight: 400; color: #fff;
+  outline: none; transition: border-color 0.3s ease;
+}
+input:focus, textarea:focus { border-color: #fff; }
+input::placeholder, textarea::placeholder { color: #555; }
+textarea { resize: none; min-height: 80px; }
