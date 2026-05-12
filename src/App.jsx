@@ -4,6 +4,10 @@ import { useProducts } from "./hooks/useProducts";
 import AuthModal from "./components/AuthModal";
 import { supabase } from "./lib/supabase";
 
+// ─── ADMIN ───────────────────────────────────────────────────────────────────
+const ADMIN_EMAILS = ["kaafi0117@gmail.com"];
+const isAdmin = email => ADMIN_EMAILS.includes(email);
+
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const BG   = "#F7F4EF";   // warm cream — main background
 const BGA  = "#EDEAE3";   // slightly darker cream — cards, alternates
@@ -107,6 +111,7 @@ function Nav({ setPage, cc, onCart, dark = false, onAuthClick, onSignOut }) {
               </div>
               {[
                 { label: "My Orders", action: () => { setMenuOpen(false); setPage("orders"); }, color: INK },
+                ...(isAdmin(user.email) ? [{ label: "Admin Dashboard", action: () => { setMenuOpen(false); setPage("admin"); }, color: INK }] : []),
                 { label: "Sign Out",  action: () => { setMenuOpen(false); onSignOut?.(); },      color: "#c0392b" },
               ].map(({ label, action, color }) => (
                 <div key={label} onClick={action} style={{
@@ -939,6 +944,240 @@ function OrdersPage({ setPage, onCart, cc, onAuthClick, onSignOut }) {
   );
 }
 
+// ─── ADMIN DASHBOARD ─────────────────────────────────────────────────────────
+function AdminDashboard({ setPage, onCart, cc, onAuthClick, onSignOut }) {
+  const { user } = useAuth();
+  const [tab,        setTab]        = useState("orders");
+  const [orders,     setOrders]     = useState([]);
+  const [inventory,  setInventory]  = useState([]);
+  const [adminProds, setAdminProds] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [v, setV] = useState(false);
+  useEffect(() => { setTimeout(() => setV(true), 100); }, []);
+
+  // ── Data loaders ────────────────────────────────────────────────────────────
+  const fetchOrders = async () => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*, order_items(*)")
+      .order("created_at", { ascending: false });
+    if (error) console.error("[admin orders]", error.message);
+    setOrders(data || []);
+  };
+
+  const fetchInventory = async () => {
+    const [{ data: inv, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
+      supabase.from("inventory").select("*").order("product_id"),
+      supabase.from("products").select("id, name, color").order("name"),
+    ]);
+    if (e1) console.error("[admin inventory]", e1.message);
+    if (e2) console.error("[admin products]",  e2.message);
+    setInventory(inv   || []);
+    setAdminProds(prods || []);
+  };
+
+  useEffect(() => {
+    if (!user || !isAdmin(user.email)) return;
+    Promise.all([fetchOrders(), fetchInventory()]).finally(() => setLoading(false));
+  }, [user]);
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  const updateStatus = async (orderId, status) => {
+    setUpdatingId(orderId);
+    const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+    if (!error) setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    setUpdatingId(null);
+  };
+
+  const updateStock = async (productId, size, val) => {
+    const stock = Math.max(0, parseInt(val) || 0);
+    await supabase.from("inventory")
+      .update({ stock, updated_at: new Date().toISOString() })
+      .eq("product_id", productId).eq("size", size);
+    setInventory(prev =>
+      prev.map(it => it.product_id === productId && it.size === size ? { ...it, stock } : it)
+    );
+  };
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const STATUS_OPTIONS = ["paid", "shipped", "delivered", "cancelled"];
+  const statusStyle = s => ({
+    paid:      { bg: "#e8f5e9", color: "#2e7d32" },
+    shipped:   { bg: "#e3f2fd", color: "#1565c0" },
+    delivered: { bg: "#f1f8e9", color: "#558b2f" },
+    cancelled: { bg: "#fce4ec", color: "#c62828" },
+    pending:   { bg: BGA,       color: INK3       },
+  }[s] || { bg: BGA, color: INK3 });
+
+  // ── Guard ───────────────────────────────────────────────────────────────────
+  if (!user || !isAdmin(user.email)) {
+    return (
+      <div style={{ background: BG, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ ...SANS, fontSize: 13, color: INK3 }}>Access denied.</p>
+      </div>
+    );
+  }
+
+  const totalRevenue = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+
+  return (
+    <div style={{ background: BG, minHeight: "100vh" }}>
+      <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "100px 32px 80px", opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(16px)", transition: "all 0.8s ease" }}>
+
+        {/* ── Header ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `1px solid ${BDR}`, paddingBottom: 24, marginBottom: 36 }}>
+          <div>
+            <p style={{ ...SANS, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, marginBottom: 8 }}>Admin</p>
+            <h1 style={{ ...SERIF, fontSize: "clamp(28px, 4vw, 48px)", color: INK, fontWeight: 300 }}>Dashboard</h1>
+          </div>
+          <p style={{ ...SANS, fontSize: 11, color: INK3 }}>
+            {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        </div>
+
+        {/* ── Stats ── */}
+        {!loading && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 40 }}>
+            {[
+              { label: "Total Orders",  value: orders.length },
+              { label: "Revenue",       value: `₹${totalRevenue.toLocaleString("en-IN")}` },
+              { label: "Shipped",       value: orders.filter(o => o.status === "shipped").length },
+              { label: "Delivered",     value: orders.filter(o => o.status === "delivered").length },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ padding: "20px 24px", background: SFC, border: `1px solid ${BDR}` }}>
+                <p style={{ ...SANS, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: INK3, marginBottom: 10 }}>{label}</p>
+                <p style={{ ...SERIF, fontSize: 30, color: INK, fontWeight: 400 }}>{value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Tabs ── */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${BDR}`, marginBottom: 32 }}>
+          {["orders", "inventory"].map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              ...SANS, padding: "12px 28px", fontSize: 10, letterSpacing: "0.16em",
+              textTransform: "uppercase", fontWeight: 500, cursor: "pointer",
+              background: "transparent", border: "none",
+              borderBottom: tab === t ? `2px solid ${INK}` : "2px solid transparent",
+              color: tab === t ? INK : INK3, marginBottom: -1, transition: "all 0.2s ease",
+            }}>{t}</button>
+          ))}
+        </div>
+
+        {loading ? (
+          <p style={{ ...SANS, fontSize: 12, color: INK3, padding: "60px 0", textAlign: "center" }}>Loading...</p>
+
+        ) : tab === "orders" ? (
+          /* ════ ORDERS TAB ════ */
+          <div>
+            {orders.length === 0 ? (
+              <p style={{ ...SANS, fontSize: 13, color: INK3, textAlign: "center", padding: "60px 0" }}>No orders yet.</p>
+            ) : orders.map(order => {
+              const sc = statusStyle(order.status);
+              return (
+                <div key={order.id} style={{ marginBottom: 10, padding: "20px 24px", background: SFC, border: `1px solid ${BDR}`, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
+                  {/* Left */}
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 8 }}>
+                      <p style={{ ...SANS, fontSize: 12, fontWeight: 600, color: INK, letterSpacing: "0.04em" }}>{order.order_number}</p>
+                      <span style={{ ...SANS, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, padding: "3px 9px", background: sc.bg, color: sc.color }}>{order.status}</span>
+                      <p style={{ ...SANS, fontSize: 10, color: INK3 }}>
+                        {new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <p style={{ ...SANS, fontSize: 11, color: INK2, marginBottom: 3 }}>
+                      {order.customer_name} &nbsp;·&nbsp; {order.customer_email} &nbsp;·&nbsp; {order.customer_phone}
+                    </p>
+                    <p style={{ ...SANS, fontSize: 10, color: INK3, marginBottom: 12 }}>
+                      {order.shipping_address}, {order.shipping_city} — {order.shipping_pincode}
+                    </p>
+                    <div style={{ borderTop: `1px solid ${BDR}`, paddingTop: 8 }}>
+                      {(order.order_items || []).map((item, i) => (
+                        <p key={i} style={{ ...SANS, fontSize: 10, color: INK3, marginBottom: 3 }}>
+                          {item.product_name} — {item.color} / {item.size} × {item.qty}
+                          {" "}<span style={{ color: INK, fontWeight: 600 }}>₹{item.price * item.qty}</span>
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Right */}
+                  <div style={{ textAlign: "right", minWidth: 148 }}>
+                    <p style={{ ...SERIF, fontSize: 22, color: INK, marginBottom: 14 }}>₹{order.total.toLocaleString("en-IN")}</p>
+                    <select
+                      value={order.status}
+                      disabled={updatingId === order.id}
+                      onChange={e => updateStatus(order.id, e.target.value)}
+                      style={{
+                        ...SANS, fontSize: 10, padding: "8px 10px", width: "100%",
+                        border: `1px solid ${BDR}`, background: SFC, color: INK,
+                        cursor: "pointer", letterSpacing: "0.06em", outline: "none",
+                      }}
+                    >
+                      {STATUS_OPTIONS.map(s => (
+                        <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                      ))}
+                    </select>
+                    {updatingId === order.id && (
+                      <p style={{ ...SANS, fontSize: 9, color: INK3, marginTop: 5, letterSpacing: "0.06em" }}>Saving...</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        ) : (
+          /* ════ INVENTORY TAB ════ */
+          <div>
+            <p style={{ ...SANS, fontSize: 11, color: INK3, marginBottom: 24 }}>
+              Click any number to change stock. 0 = sold out (shown in red).
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+              {adminProds.map(product => (
+                <div key={product.id} style={{ padding: "24px", background: SFC, border: `1px solid ${BDR}` }}>
+                  <p style={{ ...SANS, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: INK3, marginBottom: 4 }}>Product</p>
+                  <p style={{ ...SERIF, fontSize: 20, color: INK, fontWeight: 400, marginBottom: 2 }}>{product.name}</p>
+                  <p style={{ ...SANS, fontSize: 11, color: INK2, marginBottom: 20 }}>{product.color}</p>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {["S", "M", "L"].map(size => {
+                      const row   = inventory.find(i => i.product_id === product.id && i.size === size);
+                      const stock = row?.stock ?? 0;
+                      const soldOut = stock === 0;
+                      return (
+                        <div key={size} style={{ flex: 1, textAlign: "center" }}>
+                          <p style={{ ...SANS, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: INK3, marginBottom: 6, fontWeight: 600 }}>{size}</p>
+                          <input
+                            type="number" min="0" value={stock}
+                            onChange={e => updateStock(product.id, size, e.target.value)}
+                            style={{
+                              textAlign: "center", padding: "10px 4px", width: "100%",
+                              border: `1px solid ${soldOut ? "#fca5a5" : BDR}`,
+                              background: soldOut ? "#fef2f2" : SFC,
+                              ...SANS, fontSize: 15, fontWeight: 600,
+                              color: soldOut ? "#ef4444" : INK, outline: "none",
+                            }}
+                          />
+                          {soldOut && (
+                            <p style={{ ...SANS, fontSize: 8, color: "#ef4444", marginTop: 4, letterSpacing: "0.08em", textTransform: "uppercase" }}>Sold Out</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── FOOTER ──────────────────────────────────────────────────────────────────
 function Footer({ setPage }) {
   return (
@@ -1038,6 +1277,7 @@ export default function App() {
       {pg === "checkout" && <Checkout cart={cart} setPage={nav} setOD={setOD} {...navProps} />}
       {pg === "confirm"  && <Confirm  od={od} setPage={nav} />}
       {pg === "orders"   && user && <OrdersPage {...navProps} />}
+      {pg === "admin"    && user && isAdmin(user.email) && <AdminDashboard {...navProps} />}
 
       <Footer setPage={nav} />
 
