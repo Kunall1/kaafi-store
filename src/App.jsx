@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useProducts } from "./hooks/useProducts";
 import AuthModal from "./components/AuthModal";
+import { supabase } from "./lib/supabase";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -919,29 +920,161 @@ function CartDrawer({ cart, open, onClose, uq, ri, setPage, handleCheckout }) {
 }
 
 // ─── CHECKOUT ────────────────────────────────────────────────────────────────
-// NOTE: Payment is currently a placeholder — real Razorpay integration coming in Phase 4
+// Phase 4: Real Razorpay payment flow
+//
+// Flow:
+//  1. User fills form → clicks PAY
+//  2. We call /api/create-order (server) → get Razorpay order_id
+//  3. Razorpay modal opens (test card: 4111 1111 1111 1111, any future date, any CVV)
+//  4. User pays → Razorpay calls handler() with payment_id + signature
+//  5. We call /api/verify-payment (server) → verifies signature, sends email
+//  6. We save order + items to Supabase (client, uses user's session)
+//  7. Navigate to confirm page
 function Checkout({ cart, setPage, setOD, onCart, cc, onAuthClick, onSignOut }) {
-  const [f, setF] = useState({ name: "", email: "", phone: "", address: "", city: "", pincode: "" });
+  const { user } = useAuth();
+  const [f, setF]   = useState({ name: "", email: "", phone: "", address: "", city: "", pincode: "" });
   const [pr, setPr] = useState(false);
-  const [v, setV] = useState(false);
+  const [err, setErr] = useState("");
+  const [v, setV]   = useState(false);
   useEffect(() => { setTimeout(() => setV(true), 100); }, []);
-  const total = cart.reduce((s, it) => s + it.price * it.qty, 0);
-  const hc = k => e => setF({ ...f, [k]: e.target.value });
 
-  const submit = () => {
-    if (!f.name || !f.email || !f.phone || !f.address || !f.city || !f.pincode) return;
+  // Pre-fill email from logged-in user
+  useEffect(() => {
+    if (user?.email) setF(prev => ({ ...prev, email: prev.email || user.email }));
+  }, [user]);
+
+  const total = cart.reduce((s, it) => s + it.price * it.qty, 0);
+  const hc    = k => e => setF({ ...f, [k]: e.target.value });
+
+  // Dynamically load the Razorpay checkout script (only once)
+  const loadRazorpay = () => new Promise(resolve => {
+    if (window.Razorpay) return resolve(true);
+    const s  = document.createElement("script");
+    s.src    = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload  = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+
+  const submit = async () => {
+    if (!f.name || !f.email || !f.phone || !f.address || !f.city || !f.pincode) {
+      setErr("Please fill in all fields.");
+      return;
+    }
+    setErr("");
     setPr(true);
-    // TODO Phase 4: Replace this with real Razorpay payment flow
-    setTimeout(() => {
-      setOD({
-        orderId: "KAAFI-" + Date.now().toString(36).toUpperCase(),
-        customer: f, items: cart, total,
-        paymentId: "pay_" + Math.random().toString(36).substr(2, 14),
-        timestamp: new Date().toISOString(), status: "confirmed"
+
+    try {
+      // ── Step 1: Load Razorpay JS ─────────────────────────────────────────
+      const loaded = await loadRazorpay();
+      if (!loaded) throw new Error("Could not load payment gateway. Check your connection.");
+
+      // ── Step 2: Create order on Vercel server ────────────────────────────
+      const orderRes  = await fetch("/api/create-order", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ amount: total, receipt: `kaafi_${Date.now()}` }),
       });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.error || "Failed to create order");
+
+      // ── Step 3: Open Razorpay modal ──────────────────────────────────────
+      await new Promise((resolve, reject) => {
+        const rzp = new window.Razorpay({
+          key:         import.meta.env.VITE_RAZORPAY_KEY_ID,
+          amount:      orderData.amount,
+          currency:    orderData.currency,
+          order_id:    orderData.id,
+          name:        "KAAFI",
+          description: "Founder's Drop",
+          prefill:     { name: f.name, email: f.email, contact: f.phone },
+          theme:       { color: "#ffffff" },
+          modal:       { ondismiss: () => reject(new Error("cancelled")) },
+
+          handler: async (response) => {
+            try {
+              // ── Step 4: Verify signature on server ──────────────────────
+              const verifyRes  = await fetch("/api/verify-payment", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature:  response.razorpay_signature,
+                  customer: f,
+                  items:    cart,
+                  total,
+                }),
+              });
+              const verifyData = await verifyRes.json();
+              if (!verifyRes.ok) throw new Error(verifyData.error || "Payment verification failed");
+
+              // ── Step 5: Save order to Supabase ──────────────────────────
+              if (user) {
+                const { data: order, error: orderErr } = await supabase
+                  .from("orders")
+                  .insert({
+                    order_number:     verifyData.orderId,
+                    user_id:          user.id,
+                    customer_name:    f.name,
+                    customer_email:   f.email,
+                    customer_phone:   f.phone,
+                    shipping_address: f.address,
+                    shipping_city:    f.city,
+                    shipping_pincode: f.pincode,
+                    total,
+                    payment_id:        response.razorpay_payment_id,
+                    razorpay_order_id: response.razorpay_order_id,
+                    status:            "paid",
+                  })
+                  .select()
+                  .single();
+
+                if (orderErr) {
+                  console.error("[checkout] DB order insert error:", orderErr.message);
+                } else if (order) {
+                  // Save line items (order_items table)
+                  await supabase.from("order_items").insert(
+                    cart.map(item => ({
+                      order_id:     order.id,
+                      product_id:   item.id,
+                      product_name: item.name,
+                      color:        item.color,
+                      size:         item.selectedSize,
+                      qty:          item.qty,
+                      price:        item.price,
+                    }))
+                  );
+                }
+              }
+
+              // ── Step 6: Set order data for confirmation page ─────────────
+              setOD({
+                orderId:   verifyData.orderId,
+                customer:  f,
+                items:     cart,
+                total,
+                paymentId: response.razorpay_payment_id,
+                timestamp: new Date().toISOString(),
+                status:    "paid",
+              });
+              resolve();
+            } catch (e) { reject(e); }
+          },
+        });
+        rzp.open();
+      });
+
       setPr(false);
       setPage("confirm");
-    }, 2000);
+
+    } catch (e) {
+      setPr(false);
+      // "cancelled" means user closed the Razorpay modal — no error shown
+      if (e.message !== "cancelled") {
+        setErr(e.message || "Payment failed. Please try again.");
+      }
+    }
   };
 
   return (
@@ -956,23 +1089,27 @@ function Checkout({ cart, setPage, setOD, onCart, cc, onAuthClick, onSignOut }) 
         <div>
           <h2 style={{ ...HD, fontSize: 32, letterSpacing: "0.02em", marginBottom: 36 }}>CHECKOUT</h2>
           <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14, fontWeight: 600, color: "#555" }}>Contact</p>
-          <input placeholder="Full Name" value={f.name} onChange={hc("name")} style={{ marginBottom: 8 }} />
-          <input placeholder="Email" type="email" value={f.email} onChange={hc("email")} style={{ marginBottom: 8 }} />
-          <input placeholder="Phone" type="tel" value={f.phone} onChange={hc("phone")} style={{ marginBottom: 24 }} />
+          <input placeholder="Full Name"  value={f.name}  onChange={hc("name")}  style={{ marginBottom: 8 }} />
+          <input placeholder="Email"      type="email" value={f.email} onChange={hc("email")} style={{ marginBottom: 8 }} />
+          <input placeholder="Phone"      type="tel"   value={f.phone} onChange={hc("phone")} style={{ marginBottom: 24 }} />
           <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14, fontWeight: 600, color: "#555" }}>Shipping</p>
           <textarea placeholder="Address" value={f.address} onChange={hc("address")} style={{ marginBottom: 8 }} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <input placeholder="City" value={f.city} onChange={hc("city")} />
+            <input placeholder="City"     value={f.city}    onChange={hc("city")} />
             <input placeholder="PIN Code" value={f.pincode} onChange={hc("pincode")} />
           </div>
+          {err && (
+            <p style={{ fontSize: 11, color: "#e05252", marginTop: 14, letterSpacing: "0.01em" }}>{err}</p>
+          )}
           <button onClick={submit} disabled={pr} style={{
             width: "100%", marginTop: 28, padding: "18px",
             background: pr ? "#333" : "#fff", color: pr ? "#666" : "#000",
             border: "none", fontSize: 12, fontWeight: 700,
             letterSpacing: "0.2em", textTransform: "uppercase",
             cursor: pr ? "not-allowed" : "pointer", fontFamily: "'Uncial Antiqua', cursive",
+            transition: "all 0.3s ease",
           }}>
-            {pr ? "PROCESSING..." : `PAY ₹${total}`}
+            {pr ? "OPENING PAYMENT..." : `PAY ₹${total}`}
           </button>
           <p style={{ fontSize: 9, color: "#444", textAlign: "center", marginTop: 12, letterSpacing: "0.01em" }}>Secured by Razorpay</p>
         </div>
@@ -1048,6 +1185,138 @@ function Confirm({ od, setPage }) {
           letterSpacing: "0.18em", textTransform: "uppercase",
           cursor: "pointer", fontFamily: "'Uncial Antiqua', cursive",
         }}>Continue Shopping</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ORDERS PAGE ─────────────────────────────────────────────────────────────
+// Shows the logged-in user's full order history from Supabase.
+function OrdersPage({ setPage, onCart, cc, onAuthClick, onSignOut }) {
+  const { user } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [v, setV] = useState(false);
+  useEffect(() => { setTimeout(() => setV(true), 100); }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    async function fetchOrders() {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (error) console.error("[orders] fetch error:", error.message);
+      setOrders(data || []);
+      setLoading(false);
+    }
+    fetchOrders();
+  }, [user]);
+
+  const statusColor = s => ({
+    paid:      { bg: "#14532d", color: "#4ade80" },
+    shipped:   { bg: "#1e3a5f", color: "#60a5fa" },
+    delivered: { bg: "#1a2e1a", color: "#86efac" },
+    cancelled: { bg: "#2a1a1a", color: "#e05252" },
+    pending:   { bg: "#1a1a1a", color: "#888" },
+  }[s] || { bg: "#1a1a1a", color: "#888" });
+
+  return (
+    <div style={{ background: "#000", minHeight: "100vh" }}>
+      <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "100px 24px 80px" }}>
+
+        <p style={{
+          fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
+          color: "#555", fontWeight: 500, marginBottom: 16,
+          opacity: v ? 1 : 0, transition: "opacity 0.6s ease",
+        }}>Account</p>
+
+        <h1 style={{
+          ...HD, fontSize: "clamp(28px, 5vw, 48px)", letterSpacing: "0.01em", marginBottom: 40,
+          opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(20px)",
+          transition: "all 0.8s ease 0.1s",
+        }}>MY ORDERS</h1>
+
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <p style={{ fontSize: 12, color: "#555", letterSpacing: "0.08em" }}>Loading...</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div style={{
+            textAlign: "center", padding: "60px 0",
+            opacity: v ? 1 : 0, transition: "opacity 0.6s ease 0.2s",
+          }}>
+            <p style={{ ...HD, fontSize: 20, marginBottom: 10, letterSpacing: "0.02em" }}>NO ORDERS YET</p>
+            <p style={{ fontSize: 12, color: "#555", marginBottom: 28 }}>Your orders will appear here once you shop.</p>
+            <button onClick={() => setPage("shop")} style={{
+              background: "#fff", color: "#000", border: "none",
+              padding: "14px 32px", fontSize: 11, fontWeight: 700,
+              letterSpacing: "0.18em", textTransform: "uppercase",
+              cursor: "pointer", fontFamily: "'Uncial Antiqua', cursive",
+            }}>Shop Now</button>
+          </div>
+        ) : (
+          <div style={{
+            opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(20px)",
+            transition: "all 0.8s ease 0.2s",
+          }}>
+            {orders.map(order => {
+              const sc = statusColor(order.status);
+              return (
+                <div key={order.id} style={{
+                  marginBottom: 20, padding: "24px",
+                  background: "#0a0a0a", border: "1px solid #1a1a1a",
+                }}>
+                  {/* Order header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, letterSpacing: "0.04em" }}>
+                        {order.order_number}
+                      </p>
+                      <p style={{ fontSize: 10, color: "#444" }}>
+                        {new Date(order.created_at).toLocaleDateString("en-IN", {
+                          day: "numeric", month: "long", year: "numeric"
+                        })}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{
+                        fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase",
+                        fontWeight: 700, padding: "4px 10px",
+                        background: sc.bg, color: sc.color,
+                        display: "inline-block",
+                      }}>{order.status}</span>
+                      <p style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>₹{order.total}</p>
+                    </div>
+                  </div>
+
+                  {/* Line items */}
+                  <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 12 }}>
+                    {(order.order_items || []).map((item, i) => (
+                      <div key={i} style={{
+                        display: "flex", justifyContent: "space-between",
+                        fontSize: 11, color: "#666", marginBottom: 6,
+                      }}>
+                        <span>{item.product_name} — {item.color} / {item.size} × {item.qty}</span>
+                        <span style={{ color: "#aaa", fontWeight: 600 }}>₹{item.price * item.qty}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Shipping */}
+                  <p style={{
+                    fontSize: 10, color: "#333", marginTop: 12, paddingTop: 12,
+                    borderTop: "1px solid #111", letterSpacing: "0.02em",
+                  }}>
+                    📦 {order.shipping_address}, {order.shipping_city} — {order.shipping_pincode}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1196,6 +1465,7 @@ export default function App() {
       {pg === "about"    && <About    {...navProps} />}
       {pg === "checkout" && <Checkout cart={cart} setPage={nav} setOD={setOD} {...navProps} />}
       {pg === "confirm"  && <Confirm  od={od} setPage={nav} />}
+      {pg === "orders"   && user && <OrdersPage {...navProps} />}
 
       <Footer setPage={nav} />
 
