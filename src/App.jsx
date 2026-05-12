@@ -19,9 +19,10 @@ const BDR  = "#DDD8D0";   // warm border
 const BDR2 = "#C8C3BB";   // darker border
 
 // ─── TYPOGRAPHY STYLES ───────────────────────────────────────────────────────
-const SERIF = { fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 400 };
-const SANS  = { fontFamily: "'Inter', system-ui, sans-serif",       fontWeight: 400 };
-const LOGO  = { fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 600, letterSpacing: "0.14em" };
+const JK    = { fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" };
+const SERIF = { ...JK, fontWeight: 800 };          // bold headlines
+const SANS  = { ...JK, fontWeight: 400 };          // body text
+const LOGO  = { ...JK, fontWeight: 800, letterSpacing: "0.18em" }; // wordmark
 
 // ─── SIZE CHART DATA ─────────────────────────────────────────────────────────
 const SIZE_CHART = {
@@ -158,39 +159,41 @@ function Hero({ setPage, onCart, cc, onAuthClick, onSignOut }) {
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E")`,
         }} />
 
-        <div style={{ textAlign: "center", padding: "0 24px", zIndex: 2, maxWidth: 960 }}>
+        <div style={{ width: "100%", padding: "0 40px", zIndex: 2, maxWidth: 1200 }}>
+          {/* Top label */}
           <p style={{
-            ...SANS, fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase",
-            color: INK3, marginBottom: 36, fontWeight: 400,
+            ...SANS, fontSize: 11, letterSpacing: "0.28em", textTransform: "uppercase",
+            color: INK3, marginBottom: 28, fontWeight: 500,
             opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(10px)",
-            transition: "all 0.8s ease 0.2s",
+            transition: "all 0.7s ease 0.2s",
           }}>Founder's Drop — SS 2026</p>
 
+          {/* Big wordmark */}
           <h1 style={{
-            ...SERIF, fontWeight: 300, fontStyle: "normal",
-            fontSize: "clamp(72px, 15vw, 180px)",
-            letterSpacing: "-0.01em", lineHeight: 0.88, color: INK,
-            opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(28px)",
-            transition: "all 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.05s",
+            ...JK, fontWeight: 800,
+            fontSize: "clamp(80px, 16vw, 200px)",
+            letterSpacing: "-0.03em", lineHeight: 0.85, color: INK,
+            opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(32px)",
+            transition: "all 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.05s",
+            textTransform: "uppercase",
           }}>
-            Crop<br /><em>Essentials</em>
+            Crop<br />
+            <span style={{ fontWeight: 200, fontStyle: "italic" }}>Essentials</span>
           </h1>
 
-          <div style={{ width: 36, height: 1, background: BDR2, margin: "36px auto", opacity: v ? 1 : 0, transition: "opacity 0.8s ease 0.7s" }} />
-
-          <p style={{
-            ...SANS, fontSize: 13, fontWeight: 300, color: INK2,
-            maxWidth: 340, margin: "0 auto 40px", lineHeight: 1.85,
+          {/* Bottom row: tagline + CTA */}
+          <div style={{
+            display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+            marginTop: 48, flexWrap: "wrap", gap: 24,
             opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(12px)",
-            transition: "all 0.8s ease 0.8s",
+            transition: "all 0.8s ease 0.9s",
           }}>
-            Cropped silhouettes crafted with intention.<br />No logos. No noise. Just the cut.
-          </p>
-
-          <div style={{ opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(12px)", transition: "all 0.8s ease 1s" }}>
+            <p style={{ ...SANS, fontSize: 13, fontWeight: 300, color: INK2, lineHeight: 1.8, maxWidth: 280 }}>
+              No logos. No noise.<br />Just the cut.
+            </p>
             <button
               onClick={() => setPage("shop")}
-              style={{ ...SANS, background: INK, color: BG, border: "none", padding: "15px 52px", fontSize: 10, fontWeight: 500, letterSpacing: "0.22em", textTransform: "uppercase", cursor: "pointer", transition: "background 0.3s ease" }}
+              style={{ ...JK, background: INK, color: BG, border: "none", padding: "16px 56px", fontSize: 11, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", transition: "background 0.3s ease", flexShrink: 0 }}
               onMouseEnter={e => { e.currentTarget.style.background = "#2a2a2a"; }}
               onMouseLeave={e => { e.currentTarget.style.background = INK; }}
             >Shop Now</button>
@@ -207,11 +210,11 @@ function Hero({ setPage, onCart, cc, onAuthClick, onSignOut }) {
 // ─── MARQUEE SECTION ─────────────────────────────────────────────────────────
 function MarqueeSection({ text, bg = INK, color = BG }) {
   return (
-    <div style={{ background: bg, overflow: "hidden", padding: "14px 0" }}>
+    <div style={{ background: bg, overflow: "hidden", padding: "16px 0" }}>
       <div style={{ display: "flex", whiteSpace: "nowrap", animation: "marquee 18s linear infinite" }}>
         {Array(10).fill(null).map((_, i) => (
-          <span key={i} style={{ ...SERIF, fontSize: 26, letterSpacing: "0.02em", color, marginRight: 56, fontWeight: 300, fontStyle: "italic" }}>
-            {text} &nbsp;·
+          <span key={i} style={{ ...JK, fontSize: 13, letterSpacing: "0.22em", textTransform: "uppercase", color, marginRight: 48, fontWeight: 700 }}>
+            {text} &nbsp;/
           </span>
         ))}
       </div>
@@ -237,18 +240,18 @@ function CollectionBanner({ setPage }) {
         opacity: v ? 1 : 0, transform: v ? "translateX(0)" : "translateX(-20px)",
         transition: "all 1s cubic-bezier(0.16, 1, 0.3, 1)",
       }}>
-        <p style={{ ...SANS, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, fontWeight: 400, marginBottom: 20 }}>
+        <p style={{ ...JK, fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: INK3, fontWeight: 600, marginBottom: 20 }}>
           The Collection
         </p>
-        <h2 style={{ ...SERIF, fontSize: "clamp(40px, 6vw, 80px)", lineHeight: 0.95, marginBottom: 24, color: INK, fontWeight: 300 }}>
-          Founder's<br /><em>Drop</em>
+        <h2 style={{ ...JK, fontSize: "clamp(40px, 6vw, 72px)", lineHeight: 0.9, marginBottom: 24, color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em" }}>
+          Founder's<br /><span style={{ fontWeight: 200, fontStyle: "italic", textTransform: "none" }}>Drop</span>
         </h2>
         <p style={{ ...SANS, fontSize: 13, fontWeight: 300, color: INK2, lineHeight: 1.85, maxWidth: 320, marginBottom: 36 }}>
           Cropped silhouettes crafted with intention. Premium construction. Made in India.
         </p>
         <button
           onClick={() => setPage("shop")}
-          style={{ ...SANS, background: INK, color: BG, border: "none", padding: "14px 36px", fontSize: 10, fontWeight: 500, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", alignSelf: "flex-start", transition: "background 0.3s ease" }}
+          style={{ ...JK, background: INK, color: BG, border: "none", padding: "14px 36px", fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", cursor: "pointer", alignSelf: "flex-start", transition: "background 0.3s ease" }}
           onMouseEnter={e => { e.currentTarget.style.background = "#2a2a2a"; }}
           onMouseLeave={e => { e.currentTarget.style.background = INK; }}
         >Shop Collection</button>
@@ -288,8 +291,8 @@ function ProductGrid({ setPage, setSel, products = [], loading = false }) {
     <div id="prod-grid" style={{ background: BG, padding: "80px 32px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", maxWidth: 1200, margin: "0 auto 36px", borderBottom: `1px solid ${BDR}`, paddingBottom: 20 }}>
         <div>
-          <p style={{ ...SANS, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, fontWeight: 400, marginBottom: 8 }}>Shop</p>
-          <h2 style={{ ...SERIF, fontSize: "clamp(28px, 4vw, 48px)", color: INK, fontWeight: 300 }}>New Arrivals</h2>
+          <p style={{ ...JK, fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: INK3, fontWeight: 600, marginBottom: 8 }}>Shop</p>
+          <h2 style={{ ...JK, fontSize: "clamp(28px, 4vw, 48px)", color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em" }}>New Arrivals</h2>
         </div>
         <span onClick={() => setPage("shop")} style={{ ...SANS, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 500, color: INK2, cursor: "pointer", borderBottom: `1px solid ${BDR2}`, paddingBottom: 2 }}>
           View All
@@ -305,8 +308,8 @@ function ProductGrid({ setPage, setSel, products = [], loading = false }) {
               <img src={p.images[0]} alt={p.name} />
               <div className="quick-add">Quick Add</div>
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 20px 22px", background: `linear-gradient(transparent, rgba(247,244,239,0.96))`, zIndex: 2 }}>
-                <p style={{ ...SANS, fontSize: 12, fontWeight: 400, marginBottom: 2, color: INK }}>{p.name} — {p.color}</p>
-                <p style={{ ...SANS, fontSize: 13, fontWeight: 600, color: INK }}>₹{p.price}</p>
+                <p style={{ ...JK, fontSize: 12, fontWeight: 700, marginBottom: 2, color: INK }}>{p.name} — {p.color}</p>
+                <p style={{ ...JK, fontSize: 13, fontWeight: 400, color: INK2 }}>₹{p.price}</p>
               </div>
             </div>
           ))
@@ -362,8 +365,8 @@ function Shop({ setPage, setSel, onCart, cc, onAuthClick, onSignOut, products, p
         <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ borderBottom: `1px solid ${BDR}`, paddingBottom: 24, marginBottom: 40 }}>
-            <p style={{ ...SANS, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, fontWeight: 400, marginBottom: 8 }}>Founder's Drop</p>
-            <h1 style={{ ...SERIF, fontSize: "clamp(36px, 5vw, 64px)", color: INK, fontWeight: 300 }}>All Products</h1>
+            <p style={{ ...JK, fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: INK3, fontWeight: 600, marginBottom: 8 }}>Founder's Drop</p>
+            <h1 style={{ ...JK, fontSize: "clamp(36px, 5vw, 64px)", color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em" }}>All Products</h1>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
             {productsLoading
@@ -375,8 +378,8 @@ function Shop({ setPage, setSel, onCart, cc, onAuthClick, onSignOut, products, p
                   <img src={p.images[0]} alt={p.name} />
                   <div className="quick-add">Quick Add</div>
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 20px 22px", background: `linear-gradient(transparent, rgba(247,244,239,0.96))`, zIndex: 2 }}>
-                    <p style={{ ...SANS, fontSize: 12, fontWeight: 400, color: INK }}>{p.name} — {p.color}</p>
-                    <p style={{ ...SANS, fontSize: 13, fontWeight: 600, color: INK }}>₹{p.price}</p>
+                    <p style={{ ...JK, fontSize: 12, fontWeight: 700, color: INK }}>{p.name} — {p.color}</p>
+                    <p style={{ ...JK, fontSize: 13, fontWeight: 400, color: INK2 }}>₹{p.price}</p>
                   </div>
                 </div>
               ))
@@ -467,12 +470,12 @@ function Product({ product, addToCart, setPage, onCart, cc, onAuthClick, onSignO
 
           {/* Details */}
           <div style={{ padding: "32px 0 32px 52px", opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(16px)", transition: "all 0.8s ease 0.15s" }}>
-            <p style={{ ...SANS, fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, fontWeight: 400, marginBottom: 14 }}>Founder's Drop</p>
-            <h1 style={{ ...SERIF, fontSize: "clamp(28px, 3.5vw, 48px)", marginBottom: 10, color: INK, fontWeight: 300 }}>
-              {cur.name} — <em>{cur.color}</em>
+            <p style={{ ...JK, fontSize: 10, letterSpacing: "0.28em", textTransform: "uppercase", color: INK3, fontWeight: 600, marginBottom: 14 }}>Founder's Drop</p>
+            <h1 style={{ ...JK, fontSize: "clamp(28px, 3.5vw, 48px)", marginBottom: 10, color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em" }}>
+              {cur.name}<br /><span style={{ fontWeight: 200, fontStyle: "italic", textTransform: "none", fontSize: "0.75em" }}>{cur.color}</span>
             </h1>
-            <p style={{ ...SANS, fontSize: 22, fontWeight: 500, marginBottom: 4, color: INK }}>₹{cur.price}</p>
-            <p style={{ ...SANS, fontSize: 10, color: INK3, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 28 }}>Tax included · Free shipping</p>
+            <p style={{ ...JK, fontSize: 24, fontWeight: 700, marginBottom: 4, color: INK }}>₹{cur.price}</p>
+            <p style={{ ...JK, fontSize: 10, color: INK3, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 28 }}>Tax included · Free shipping</p>
 
             <div style={{ height: 1, background: BDR, marginBottom: 24 }} />
 
@@ -564,8 +567,8 @@ function About({ setPage, onCart, cc, onAuthClick, onSignOut }) {
         <p style={{ ...SANS, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, fontWeight: 400, marginBottom: 20, opacity: v ? 1 : 0, transition: "opacity 0.6s ease" }}>
           Our Story
         </p>
-        <h1 style={{ ...SERIF, fontSize: "clamp(40px, 7vw, 80px)", lineHeight: 0.95, marginBottom: 48, color: INK, fontWeight: 300, opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(20px)", transition: "all 1s ease 0.1s" }}>
-          Built from<br /><em>Intention</em>
+        <h1 style={{ ...JK, fontSize: "clamp(40px, 7vw, 80px)", lineHeight: 0.9, marginBottom: 48, color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em", opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(20px)", transition: "all 1s ease 0.1s" }}>
+          Built from<br /><span style={{ fontWeight: 200, fontStyle: "italic", textTransform: "none" }}>Intention</span>
         </h1>
         {[
           "KAAFI started with a question — what if a brand only made what it truly believed in?",
@@ -589,7 +592,7 @@ function CartDrawer({ cart, open, onClose, uq, ri, setPage, handleCheckout }) {
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,15,15,0.2)", zIndex: 200, opacity: open ? 1 : 0, pointerEvents: open ? "all" : "none", transition: "opacity 0.3s ease", backdropFilter: open ? "blur(2px)" : "none" }} />
       <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(400px, 90vw)", background: SFC, zIndex: 201, transform: open ? "translateX(0)" : "translateX(100%)", transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)", display: "flex", flexDirection: "column", borderLeft: `1px solid ${BDR}` }}>
         <div style={{ padding: "20px 28px", borderBottom: `1px solid ${BDR}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ ...SERIF, fontSize: 20, color: INK, fontWeight: 400 }}>Your Bag</span>
+          <span style={{ ...JK, fontSize: 14, color: INK, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" }}>Your Bag</span>
           <span onClick={onClose} style={{ cursor: "pointer", fontSize: 16, color: INK3, ...SANS }}>✕</span>
         </div>
 
@@ -774,7 +777,7 @@ function Checkout({ cart, setPage, setOD, onCart, cc, onAuthClick, onSignOut }) 
       <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "100px 32px 80px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(16px)", transition: "all 0.8s ease" }}>
         <div>
-          <h2 style={{ ...SERIF, fontSize: 36, color: INK, fontWeight: 300, marginBottom: 36 }}>Checkout</h2>
+          <h2 style={{ ...JK, fontSize: 36, color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em", marginBottom: 36 }}>Checkout</h2>
 
           <p style={{ ...SANS, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14, fontWeight: 600, color: INK3 }}>Contact</p>
           <input placeholder="Full Name"  value={f.name}  onChange={hc("name")}  style={{ marginBottom: 8 }} />
@@ -838,7 +841,7 @@ function Confirm({ od, setPage }) {
         <div style={{ width: 52, height: 52, borderRadius: "50%", border: `1.5px solid ${INK}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="1.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
-        <h1 style={{ ...SERIF, fontSize: "clamp(36px, 6vw, 56px)", marginBottom: 12, color: INK, fontWeight: 300 }}>Thank You</h1>
+        <h1 style={{ ...JK, fontSize: "clamp(36px, 6vw, 56px)", marginBottom: 12, color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em" }}>Thank You</h1>
         <p style={{ ...SANS, fontSize: 13, color: INK2, lineHeight: 1.8, marginBottom: 36 }}>
           Order <strong style={{ color: INK }}>{od.orderId}</strong><br />
           Confirmation sent to {od.customer.email}
@@ -897,7 +900,7 @@ function OrdersPage({ setPage, onCart, cc, onAuthClick, onSignOut }) {
       <Nav setPage={setPage} cc={cc} onCart={onCart} onAuthClick={onAuthClick} onSignOut={onSignOut} />
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "100px 32px 80px" }}>
         <p style={{ ...SANS, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: INK3, marginBottom: 16, opacity: v ? 1 : 0, transition: "opacity 0.6s ease" }}>Account</p>
-        <h1 style={{ ...SERIF, fontSize: "clamp(28px, 5vw, 48px)", color: INK, fontWeight: 300, marginBottom: 40, opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(16px)", transition: "all 0.8s ease 0.1s" }}>My Orders</h1>
+        <h1 style={{ ...JK, fontSize: "clamp(28px, 5vw, 48px)", color: INK, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-0.02em", marginBottom: 40, opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(16px)", transition: "all 0.8s ease 0.1s" }}>My Orders</h1>
 
         {loading ? (
           <p style={{ ...SANS, fontSize: 12, color: INK3, textAlign: "center", padding: "60px 0" }}>Loading...</p>
